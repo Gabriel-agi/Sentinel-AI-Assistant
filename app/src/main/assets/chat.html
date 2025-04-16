@@ -66,20 +66,22 @@
             </div>
             <div id="triggerCounterDisplay">Alert: 0/3</div>
 
-            <!-- *** NEW: Blackout Button *** -->
+            <!-- Blackout Button -->
             <button id="blackoutButton" title="Dim Screen Content">
-                <!-- Simple Moon Icon SVG -->
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22px" height="22px">
                     <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.31 0-6-2.69-6-6 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
                 </svg>
             </button>
-            <!-- *** END NEW *** -->
 
+            <!-- Settings Button -->
             <button id="settingsButton" title="Settings">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
             </button>
         </div>
-        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-messages" id="chatMessages">
+            <!-- Chat messages will be added here by JavaScript -->
+            <!-- They are NOT saved in localStorage -->
+        </div>
          <div class="input-area">
             <div id="imagePreviewContainer">
                 <img id="previewImage" src="" alt="Preview">
@@ -132,14 +134,24 @@
         </div>
     </div>
 
-    <!-- *** NEW: Blackout Overlay (Place outside main chat container if hiding header) *** -->
+    <!-- Blackout Overlay -->
     <div id="blackoutOverlay"></div>
 
     <script>
         console.log("Script start");
 
         // --- Constants and API ---
-        const MODEL_NAME = 'gemini-1.5-flash-latest';
+        const MODEL_NAME = 'gemini-2.0-flash';
+        // --- localStorage Keys ---
+        const LS_KEYS = {
+            API_KEY: 'sentinelAi_apiKey',
+            CUSTOM_PROMPT: 'sentinelAi_customPrompt',
+            INTERVAL: 'sentinelAi_intervalSeconds',
+            ALERT_ENABLED: 'sentinelAi_alertEnabled',
+            ALERT_PHRASE: 'sentinelAi_alertPhrase',
+            REQUIRED_TRIGGERS: 'sentinelAi_requiredTriggers',
+            PHONE_NUMBER: 'sentinelAi_phoneNumber'
+        };
 
         // --- DOM Element Variables ---
         let chatMessages, userInput, sendButton, imagePreviewContainer, previewImageElement,
@@ -147,28 +159,30 @@
             customPromptInput, intervalInput, enableAlertCheckbox, alertTriggerPhraseInput,
             requiredTriggersInput, phoneNumberInput,
             triggerCounterDisplay, removeImageButton, apiKeyInput,
-            // *** NEW: Add references ***
-            blackoutButton, blackoutOverlay, chatHeader; // Add chatHeader here
-
+            blackoutButton, blackoutOverlay, chatHeader;
 
         // --- State Variables ---
+        // (Defaults will now be set primarily by the loading function)
         let pendingImageDataUrl = null;
         let pendingImageBase64 = null;
         let isAutoCapturing = false;
-        let customPromptText = "";
-        let captureIntervalSeconds = 30;
+        let customPromptText = "Describe this scene."; // Default if nothing loaded
+        let captureIntervalSeconds = 30; // Default if nothing loaded
         let autoCaptureIntervalId = null;
-        let isAlertOnResponseEnabled = false;
-        let alertTriggerPhrase = "";
-        let requiredAlertTriggers = 3;
+        let isAlertOnResponseEnabled = false; // Default if nothing loaded
+        let alertTriggerPhrase = ""; // Default if nothing loaded
+        let requiredAlertTriggers = 3; // Default if nothing loaded
         let currentAlertTriggerCount = 0;
-        let phoneNumber = '';
-        let userApiKey = '';
+        let phoneNumber = ''; // Default if nothing loaded
+        let userApiKey = ''; // Default if nothing loaded
 
         // --- Initialization Function ---
         function initializeApp() {
             console.log("Initializing app...");
             try {
+                // Load settings from localStorage FIRST
+                loadSettingsFromLocalStorage(); // Load saved values into state variables
+
                 // Get references to all DOM elements
                 chatMessages = document.getElementById('chatMessages');
                 userInput = document.getElementById('userInput');
@@ -188,29 +202,18 @@
                 triggerCounterDisplay = document.getElementById('triggerCounterDisplay');
                 removeImageButton = document.getElementById('removeImageButton');
                 apiKeyInput = document.getElementById('apiKeyInput');
-
-                // *** NEW: Get new elements ***
                 blackoutButton = document.getElementById('blackoutButton');
                 blackoutOverlay = document.getElementById('blackoutOverlay');
-                chatHeader = document.querySelector('.chat-header'); // Get header reference
+                chatHeader = document.querySelector('.chat-header');
 
                 // Check if all essential elements were found
-                const essentialElements = [
-                    chatMessages, userInput, sendButton, settingsButton, settingsModal, closeSettingsButton,
-                    toggleAutoCaptureButton, customPromptInput, intervalInput, enableAlertCheckbox,
-                    alertTriggerPhraseInput, requiredTriggersInput, phoneNumberInput, triggerCounterDisplay,
-                    removeImageButton, imagePreviewContainer, previewImageElement, apiKeyInput,
-                    // *** NEW: Check new elements ***
-                    blackoutButton, blackoutOverlay, chatHeader
-                ];
+                const essentialElements = [ chatMessages, userInput, sendButton, settingsButton, settingsModal, closeSettingsButton, toggleAutoCaptureButton, customPromptInput, intervalInput, enableAlertCheckbox, alertTriggerPhraseInput, requiredTriggersInput, phoneNumberInput, triggerCounterDisplay, removeImageButton, imagePreviewContainer, previewImageElement, apiKeyInput, blackoutButton, blackoutOverlay, chatHeader ];
                  if (essentialElements.some(el => !el)) {
-                     // Log which elements are missing for easier debugging
                      const missing = essentialElements.map((el, index) => el ? null : ['chatMessages', 'userInput', 'sendButton', 'settingsButton', 'settingsModal', 'closeSettingsButton', 'toggleAutoCaptureButton', 'customPromptInput', 'intervalInput', 'enableAlertCheckbox', 'alertTriggerPhraseInput', 'requiredTriggersInput', 'phoneNumberInput', 'triggerCounterDisplay', 'removeImageButton', 'imagePreviewContainer', 'previewImageElement', 'apiKeyInput', 'blackoutButton', 'blackoutOverlay', 'chatHeader'][index]).filter(Boolean);
                      console.error(`CRITICAL ERROR: One or more essential DOM elements not found! Missing: ${missing.join(', ')}. Check HTML IDs and selectors.`);
                      alert(`Interface Error: Could not initialize elements: ${missing.join(', ')}. Check IDs/Selectors.`);
                      return;
                  }
-
                 console.log("All essential elements found.");
 
                 // Add Event Listeners
@@ -221,11 +224,8 @@
                      closeSettingsButton.addEventListener('click', closeAndSaveSettings);
                      toggleAutoCaptureButton.addEventListener('click', toggleAutoCapture);
                      removeImageButton.addEventListener('click', removePreviewImage);
-
-                     // *** NEW: Add listeners for blackout ***
                      blackoutButton.addEventListener('click', activateBlackout);
-                     blackoutOverlay.addEventListener('click', deactivateBlackout); // Click overlay to dismiss
-
+                     blackoutOverlay.addEventListener('click', deactivateBlackout);
                      console.log("Event listeners added.");
                  } catch (listenerError) {
                       console.error("Error adding event listeners:", listenerError);
@@ -236,9 +236,14 @@
                 // Initial UI State
                 requestAnimationFrame(() => {
                     setTimeout(() => {
-                        addMessage("Hello! Sentinel AI ready. Use ⚙️ for settings. Please enter your API Key.", 'assistant');
+                        // Check if API key is present after loading
+                        if (!userApiKey) {
+                             addMessage("Hello! Sentinel AI ready. Use ⚙️ for settings. Please enter your API Key first.", 'assistant');
+                        } else {
+                             addMessage("Hello! Sentinel AI ready. Settings loaded. Use ⚙️ to modify.", 'assistant');
+                        }
                         adjustInputHeight();
-                        updateAlertCounterDisplay();
+                        updateAlertCounterDisplay(); // Reflect loaded alert settings state
                         console.log("Initial message added and UI updated.");
                     }, 100);
                 });
@@ -248,6 +253,45 @@
                 alert("A critical error occurred during app initialization.");
             }
         }
+
+        // --- Function to Load Settings from localStorage ---
+        function loadSettingsFromLocalStorage() {
+            console.log("Attempting to load settings from localStorage...");
+            try {
+                const loadedApiKey = localStorage.getItem(LS_KEYS.API_KEY);
+                const loadedPrompt = localStorage.getItem(LS_KEYS.CUSTOM_PROMPT);
+                const loadedInterval = localStorage.getItem(LS_KEYS.INTERVAL);
+                const loadedAlertEnabled = localStorage.getItem(LS_KEYS.ALERT_ENABLED);
+                const loadedAlertPhrase = localStorage.getItem(LS_KEYS.ALERT_PHRASE);
+                const loadedRequiredTriggers = localStorage.getItem(LS_KEYS.REQUIRED_TRIGGERS);
+                const loadedPhoneNumber = localStorage.getItem(LS_KEYS.PHONE_NUMBER);
+
+                // Assign to state variables, using defaults if null/invalid
+                userApiKey = loadedApiKey || '';
+                customPromptText = loadedPrompt || "Describe this scene."; // Use default if not found
+
+                let parsedInterval = parseInt(loadedInterval, 10);
+                captureIntervalSeconds = (!isNaN(parsedInterval) && parsedInterval >= 5) ? parsedInterval : 30; // Validate
+
+                // localStorage stores booleans as strings 'true'/'false'
+                isAlertOnResponseEnabled = loadedAlertEnabled === 'true';
+
+                alertTriggerPhrase = loadedAlertPhrase || '';
+
+                let parsedTriggers = parseInt(loadedRequiredTriggers, 10);
+                requiredAlertTriggers = (!isNaN(parsedTriggers) && parsedTriggers >= 1) ? parsedTriggers : 3; // Validate
+
+                phoneNumber = loadedPhoneNumber || '';
+
+                console.log(`Loaded Settings: API Key Set (Length: ${userApiKey.length}), Prompt='${customPromptText}', Interval=${captureIntervalSeconds}, AlertOn=${isAlertOnResponseEnabled}, Phrase='${alertTriggerPhrase}', Triggers=${requiredAlertTriggers}, Number='${phoneNumber || 'None'}'`);
+
+            } catch (e) {
+                console.error("Error loading settings from localStorage:", e);
+                alert("Could not load saved settings. Using defaults.");
+                // Ensure defaults are set if loading fails catastrophically (though defaults are already set above)
+            }
+        }
+
 
         // --- Event Listener Callbacks ---
         function handleUserInputKeypress(e) {
@@ -259,6 +303,7 @@
 
         function openSettingsModal() {
             try {
+                // Populate modal fields with CURRENT state variables (which were loaded or set)
                 apiKeyInput.value = userApiKey;
                 customPromptInput.value = customPromptText;
                 intervalInput.value = captureIntervalSeconds;
@@ -274,27 +319,47 @@
 
         function closeAndSaveSettings() {
              try {
+                // 1. Read values from inputs into JS state variables (existing logic)
                 userApiKey = apiKeyInput.value.trim();
+                customPromptText = customPromptInput.value.trim();
+                const intervalVal = parseInt(intervalInput.value, 10);
+                captureIntervalSeconds = isNaN(intervalVal) || intervalVal < 5 ? 5 : intervalVal; // Use validated value
                 isAlertOnResponseEnabled = enableAlertCheckbox.checked;
                 alertTriggerPhrase = alertTriggerPhraseInput.value.trim().toLowerCase();
                 const reqTriggersVal = parseInt(requiredTriggersInput.value, 10);
-                requiredAlertTriggers = isNaN(reqTriggersVal) || reqTriggersVal < 1 ? 1 : reqTriggersVal;
+                requiredAlertTriggers = isNaN(reqTriggersVal) || reqTriggersVal < 1 ? 1 : reqTriggersVal; // Use validated value
                 phoneNumber = phoneNumberInput.value.trim();
-                customPromptText = customPromptInput.value.trim();
-                const intervalVal = parseInt(intervalInput.value, 10);
-                captureIntervalSeconds = isNaN(intervalVal) || intervalVal < 5 ? 5 : intervalVal;
 
-                console.log(`Settings Saved: API Key Set (Length: ${userApiKey.length}), AutoPrompt='${customPromptText}', Interval=${captureIntervalSeconds}, AlertOn=${isAlertOnResponseEnabled}, AlertPhrase='${alertTriggerPhrase}', RequiredTriggers=${requiredAlertTriggers}, Number='${phoneNumber ? phoneNumber : 'Not set'}'`);
+                // 2. Save the current state variables to localStorage
+                console.log("Saving settings to localStorage...");
+                try {
+                    localStorage.setItem(LS_KEYS.API_KEY, userApiKey);
+                    localStorage.setItem(LS_KEYS.CUSTOM_PROMPT, customPromptText);
+                    localStorage.setItem(LS_KEYS.INTERVAL, String(captureIntervalSeconds)); // Convert number to string
+                    localStorage.setItem(LS_KEYS.ALERT_ENABLED, String(isAlertOnResponseEnabled)); // Convert boolean to string
+                    localStorage.setItem(LS_KEYS.ALERT_PHRASE, alertTriggerPhrase);
+                    localStorage.setItem(LS_KEYS.REQUIRED_TRIGGERS, String(requiredAlertTriggers)); // Convert number to string
+                    localStorage.setItem(LS_KEYS.PHONE_NUMBER, phoneNumber);
+                    console.log("Settings successfully saved to localStorage.");
+                } catch (e) {
+                    console.error("Error saving settings to localStorage:", e);
+                    alert("Could not save settings. Local storage might be full or disabled.");
+                }
+
+                // 3. Update UI and close modal (existing logic)
+                console.log(`Settings Applied & Saved: API Key Set (Length: ${userApiKey.length}), AutoPrompt='${customPromptText}', Interval=${captureIntervalSeconds}, AlertOn=${isAlertOnResponseEnabled}, AlertPhrase='${alertTriggerPhrase}', RequiredTriggers=${requiredAlertTriggers}, Number='${phoneNumber ? phoneNumber : 'Not set'}'`);
                 settingsModal.classList.remove('visible');
-                currentAlertTriggerCount = 0;
-                updateAlertCounterDisplay();
+                currentAlertTriggerCount = 0; // Reset trigger count on settings change
+                updateAlertCounterDisplay(); // Reflect potential change in alert settings state
                 if (!userApiKey) {
                    console.warn("API Key field is empty after saving settings.");
+                   addMessage("Warning: API Key is not set. Please configure it in Settings (⚙️).", 'assistant');
                 }
              } catch(error) { console.error("Error closing/saving settings:", error); }
         }
 
          function toggleAutoCapture() {
+            // This function implicitly uses the state variables, which are now loaded/saved
             try {
                 if (isAutoCapturing) {
                     stopAutoCapture();
@@ -304,43 +369,31 @@
                         openSettingsModal();
                         return;
                     }
-                    // Read settings just before starting
-                    customPromptText = customPromptInput.value.trim();
-                    const intervalVal = parseInt(intervalInput.value, 10);
-                    captureIntervalSeconds = isNaN(intervalVal) || intervalVal < 5 ? 5 : intervalVal;
-                    isAlertOnResponseEnabled = enableAlertCheckbox.checked;
-                    alertTriggerPhrase = alertTriggerPhraseInput.value.trim().toLowerCase();
-                    const reqTriggersVal = parseInt(requiredTriggersInput.value, 10);
-                    requiredAlertTriggers = isNaN(reqTriggersVal) || reqTriggersVal < 1 ? 1 : reqTriggersVal;
-                    phoneNumber = phoneNumberInput.value.trim();
+                    // Uses the current values of state variables loaded or saved
                     startAutoCapture();
                 }
              } catch(error) { console.error("Error toggling auto-capture:", error); }
         }
 
-        // *** NEW: Blackout Functions ***
+        // --- Blackout Functions ---
         function activateBlackout() {
             console.log("Activating blackout overlay.");
             if (blackoutOverlay) blackoutOverlay.style.display = 'block';
-            // Optional: Hide header for cleaner look
-            if (chatHeader) chatHeader.style.display = 'none';
+            if (chatHeader) chatHeader.style.display = 'none'; // Optional: Hide header
         }
 
         function deactivateBlackout() {
             console.log("Deactivating blackout overlay.");
             if (blackoutOverlay) blackoutOverlay.style.display = 'none';
-            // Restore header if it was hidden
-            if (chatHeader) chatHeader.style.display = 'flex'; // Ensure it uses flex again
+            if (chatHeader) chatHeader.style.display = 'flex'; // Restore header
         }
-        // *** END NEW ***
-
 
         // --- Auto Capture Logic ---
         function startAutoCapture() {
             if (!customPromptText) { alert("Please enter a custom prompt in settings."); return; }
             isAutoCapturing = true;
             toggleAutoCaptureButton.textContent = "Stop Auto-Capture"; toggleAutoCaptureButton.classList.add('stop');
-            settingsModal.classList.remove('visible');
+            settingsModal.classList.remove('visible'); // Close settings if open
             addMessage(`Auto-capture started: "${customPromptText}" every ${captureIntervalSeconds}s.`, 'assistant');
             currentAlertTriggerCount = 0; updateAlertCounterDisplay();
             if (autoCaptureIntervalId) clearInterval(autoCaptureIntervalId);
@@ -432,13 +485,10 @@
                                 console.log("Alert threshold reached!"); addMessage(`[!!! ALERT TRIGGERED (${currentAlertTriggerCount}/${requiredAlertTriggers}) !!!]`, 'assistant');
                                 // Call Android for emergency action
                                 if (phoneNumber) {
-                                    // *** CRITICAL: Ensure Android function is named initiateEmergencyCall ***
+                                    // CRITICAL: Ensure Android function is named initiateEmergencyCall
                                     if (typeof AndroidInterface !== 'undefined' && AndroidInterface.initiateEmergencyCall) {
                                         try {
-                                            // Pass the single phone number as a JSON array string
-                                            // OR adjust Android interface to accept a single string
                                             AndroidInterface.initiateEmergencyCall(phoneNumber);
-                                            // OLD: AndroidInterface.initiateEmergencyCalls(JSON.stringify([phoneNumber]));
                                             console.log(`Called AndroidInterface.initiateEmergencyCall with ${phoneNumber}`);
                                             addMessage("[Attempting call...]", "assistant");
                                         } catch (e) {
@@ -515,7 +565,8 @@
              if (!triggerCounterDisplay) { console.error("Trigger counter display missing."); return; }
              if (isAlertOnResponseEnabled && alertTriggerPhrase && requiredAlertTriggers > 0) {
                  triggerCounterDisplay.textContent = `Alert: ${currentAlertTriggerCount}/${requiredAlertTriggers}`;
-                 triggerCounterDisplay.classList.toggle('visible', currentAlertTriggerCount > 0);
+                 // Show counter if alerts are enabled, even if 0/N
+                 triggerCounterDisplay.classList.add('visible');
              } else {
                  triggerCounterDisplay.classList.remove('visible');
              }
