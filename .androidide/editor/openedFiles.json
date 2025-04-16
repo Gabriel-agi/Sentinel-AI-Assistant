@@ -1,0 +1,50 @@
+{
+  "allFiles": [
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/AI Sentinel/app/src/main/assets/chat.html",
+      "selection": {
+        "end": {
+          "column": 7,
+          "index": 40636,
+          "line": 530
+        },
+        "start": {
+          "column": 7,
+          "index": 40636,
+          "line": 530
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/AI Sentinel/app/src/main/java/com/example/aisentinel/MainActivity.kt",
+      "selection": {
+        "end": {
+          "column": 93,
+          "index": 814,
+          "line": 17
+        },
+        "start": {
+          "column": 93,
+          "index": 814,
+          "line": 17
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/AI Sentinel/app/src/main/res/layout/activity_main.xml",
+      "selection": {
+        "end": {
+          "column": 52,
+          "index": 821,
+          "line": 19
+        },
+        "start": {
+          "column": 0,
+          "index": 0,
+          "line": 0
+        }
+      }
+    }
+  ],
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/AI Sentinel/app/src/main/java/com/example/aisentinel/MainActivity.kt"
+}

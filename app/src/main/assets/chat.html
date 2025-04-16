@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sentinel AI Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { /* --- Colors --- */ --primary: #2D3250; --secondary: #424769; --accent: #7077A1; --text: #F6B17A; --bg-modal: rgba(45, 50, 80, 0.95); --bg-input: rgba(255, 255, 255, 0.1); --bg-input-focus: rgba(255, 255, 255, 0.15); --border-light: rgba(255, 255, 255, 0.1); --border-focus: rgba(255, 255, 255, 0.2); --text-light: rgba(255, 255, 255, 0.6); --text-white: white; --danger: #e74c3c; --success: #2ecc71; --gradient: linear-gradient(135deg, #2D3250, #7077A1); }
+        /* Animations */
+        @keyframes gradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } } @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } } @keyframes typing { 0% { transform: translateY(0px); } 28% { transform: translateY(-2px); } 44% { transform: translateY(0px); } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        /* Body and Container */
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; height: 100vh; background: var(--gradient); background-size: 400% 400%; animation: gradient 15s ease infinite; display: flex; flex-direction: column; overflow: hidden; }
+        .chat-container { width: 100%; height: 100%; background: transparent; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        /* Header */
+        .chat-header { padding: 10px 15px; background: rgba(45, 50, 80, 0.7); backdrop-filter: blur(5px); border-bottom: 1px solid var(--border-light); display: flex; align-items: center; gap: 10px; flex-shrink: 0; position: relative; /* Needed for absolute positioned buttons */ }
+        .logo { width: 30px; height: 30px; background: var(--text); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--primary); animation: pulse 2s infinite; font-size: 0.9rem; flex-shrink: 0; }
+        .header-text { color: var(--text-white); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-grow: 1; } .header-text h1 { font-size: 1.1rem; margin-bottom: 1px; } .header-text p { font-size: 0.75rem; opacity: 0.8; }
+        #triggerCounterDisplay { font-size: 0.75rem; color: var(--text-white); background-color: rgba(231, 76, 60, 0.2); padding: 3px 8px; border-radius: 10px; margin-left: auto; margin-right: 100px; /* Adjusted margin for buttons */ display: none; white-space: nowrap; transition: opacity 0.3s ease; opacity: 0; } #triggerCounterDisplay.visible { display: inline-block; opacity: 1; }
+
+        /* --- Style the Blackout Button --- */
+        #blackoutButton { background: none; border: none; padding: 5px; cursor: pointer; position: absolute; right: 55px; /* Space left for settings */ top: 50%; transform: translateY(-50%); z-index: 5; }
+        #blackoutButton svg { width: 22px; height: 22px; fill: var(--text-light); transition: fill 0.2s ease; }
+        #blackoutButton:hover svg { fill: var(--text-white); }
+
+        /* --- Style the Settings Button --- */
+        #settingsButton { background: none; border: none; padding: 5px; cursor: pointer; position: absolute; right: 15px; /* Farthest right */ top: 50%; transform: translateY(-50%); z-index: 5;}
+        #settingsButton svg { width: 22px; height: 22px; fill: var(--text-light); transition: fill 0.2s ease, transform 0.3s ease; }
+        #settingsButton:hover svg { fill: var(--text-white); transform: rotate(45deg); }
+
+        /* Messages Area */
+        .chat-messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; } .chat-messages::-webkit-scrollbar { width: 5px; } .chat-messages::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+        /* Individual Messages */
+        .message { max-width: 85%; padding: 10px 15px; border-radius: 18px; color: var(--text-white); animation: slideIn 0.3s ease-out forwards; position: relative; line-height: 1.4; word-wrap: break-word; } .user-message { background: var(--text); color: var(--primary); margin-left: auto; border-bottom-right-radius: 5px; } .assistant-message { background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(2px); border-bottom-left-radius: 5px; } .user-message img, .assistant-message img { max-width: 100%; max-height: 200px; border-radius: 8px; display: block; margin-top: 5px; }
+        /* Loading Indicator */
+        .loading { align-self: flex-start; display: flex; gap: 4px; padding: 10px 15px; color: var(--text-white); align-items: center; background: rgba(255, 255, 255, 0.15); border-radius: 18px; border-bottom-left-radius: 5px; } .loading span { width: 4px; height: 4px; background: var(--text-white); border-radius: 50%; display: inline-block; animation: typing 1.4s ease-in-out infinite; } .loading span:nth-child(2) { animation-delay: 0.2s; } .loading span:nth-child(3) { animation-delay: 0.4s; }
+        /* Input Area */
+        .input-area { display: flex; flex-direction: column; background: rgba(45, 50, 80, 0.7); backdrop-filter: blur(5px); padding: 10px 15px; border-top: 1px solid var(--border-light); flex-shrink: 0; } #imagePreviewContainer { margin-bottom: 8px; position: relative; display: none; max-height: 80px; align-self: flex-start; } #previewImage { max-width: 100%; max-height: 80px; border-radius: 8px; display: block; border: 1px solid var(--border-focus); } #removeImageButton { position: absolute; top: -5px; right: -5px; background: rgba(0,0,0,0.7); color: var(--text-white); border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; line-height: 20px; text-align: center; cursor: pointer; padding: 0; z-index: 10; } .input-controls { display: flex; gap: 10px; align-items: flex-end; } #userInput { flex: 1; padding: 10px 12px; border: none; border-radius: 20px; background: var(--bg-input); color: var(--text-white); font-size: 1rem; resize: none; overflow-y: auto; line-height: 1.3; max-height: 80px; } #userInput:focus { outline: none; background: var(--bg-input-focus); box-shadow: 0 0 0 2px var(--border-focus); } #userInput::placeholder { color: var(--text-light); } #sendButton { padding: 10px 15px; border: none; border-radius: 20px; background: var(--text); color: var(--primary); font-weight: bold; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.9rem; flex-shrink: 0; height: 40px; } #sendButton svg { width: 18px; height: 18px; fill: var(--primary); } #sendButton:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(246, 177, 122, 0.3); } #sendButton:active { transform: translateY(0); } #sendButton:disabled { background: rgba(255, 255, 255, 0.3); transform: none; cursor: not-allowed; color: rgba(45, 50, 80, 0.7); } #sendButton:disabled svg { fill: rgba(45, 50, 80, 0.7); }
+        /* Settings Modal Styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.3s ease-out; } .modal-overlay.visible { display: flex; } .settings-modal { background: var(--bg-modal); padding: 25px; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.3); width: 90%; max-width: 450px; border: 1px solid var(--border-light); color: var(--text-white); max-height: 85vh; overflow-y: auto; } .settings-modal h2 { text-align: center; margin-bottom: 20px; color: var(--text); font-size: 1.4rem; } .setting-section { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-light); } .setting-section:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0;} .settings-modal label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: var(--text-light); } .settings-modal textarea, .settings-modal input[type="number"], .settings-modal input[type="text"], .settings-modal input[type="password"], .settings-modal input[type="tel"] { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid var(--border-light); border-radius: 8px; background: var(--bg-input); color: var(--text-white); font-size: 1rem; } .settings-modal textarea:focus, .settings-modal input:focus { outline: none; border-color: var(--border-focus); background: var(--bg-input-focus); } .settings-modal textarea { resize: vertical; min-height: 60px; } .checkbox-container { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; cursor: pointer; } .checkbox-container input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; } .checkbox-container label { margin-bottom: 0; flex-grow: 1; } .settings-modal .modal-buttons { display: flex; justify-content: flex-end; gap: 15px; margin-top: 20px; } .setting-section button { display: block; width: 100%; padding: 10px 20px; border-radius: 8px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.2s ease, transform 0.1s ease; margin-top: 10px; } #toggleAutoCapture { background-color: var(--success); color: var(--text-white); } #toggleAutoCapture.stop { background-color: var(--danger); } #closeSettings { background-color: var(--secondary); color: var(--text-white); padding: 10px 25px; } .settings-modal button:hover { filter: brightness(1.1); } .settings-modal button:active { transform: scale(0.98); }
+
+        /* --- Style the Blackout Overlay --- */
+        #blackoutOverlay {
+            position: fixed; /* Covers the whole viewport */
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000000; /* Pure black */
+            z-index: 990; /* Below settings modal (1000) but above everything else */
+            display: none; /* Hidden by default */
+            cursor: pointer; /* Indicate it's clickable to dismiss */
+        }
+
+        @media (max-width: 768px) { .message { max-width: 90%; } }
+    </style>
+</head>
+<body>
+    <!-- Chat Container -->
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="logo">S</div>
+            <div class="header-text">
+                <h1>Sentinel AI Assistant</h1>
+                <p>Multimodal AI Interface</p>
+            </div>
+            <div id="triggerCounterDisplay">Alert: 0/3</div>
+
+            <!-- *** NEW: Blackout Button *** -->
+            <button id="blackoutButton" title="Dim Screen Content">
+                <!-- Simple Moon Icon SVG -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22px" height="22px">
+                    <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.31 0-6-2.69-6-6 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
+                </svg>
+            </button>
+            <!-- *** END NEW *** -->
+
+            <button id="settingsButton" title="Settings">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
+            </button>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+         <div class="input-area">
+            <div id="imagePreviewContainer">
+                <img id="previewImage" src="" alt="Preview">
+                <button id="removeImageButton" title="Remove Image">X</button>
+            </div>
+            <div class="input-controls">
+                <textarea id="userInput" placeholder="Ask anything..." rows="1" oninput="autoGrow(this)"></textarea>
+                <button id="sendButton" title="Send Message">
+                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal-overlay">
+        <div class="settings-modal">
+            <h2>Settings</h2>
+            <div class="setting-section">
+                 <h3>API Configuration</h3>
+                 <label for="apiKeyInput">Gemini API Key:</label>
+                 <input type="password" id="apiKeyInput" placeholder="Paste your API Key here">
+             </div>
+            <div class="setting-section">
+                <h3>Auto Capture</h3>
+                <label for="customPrompt">Custom Prompt:</label>
+                <textarea id="customPrompt" rows="3" placeholder="e.g., Describe this scene."></textarea>
+                <label for="intervalSeconds">Interval (seconds, min 5):</label>
+                <input type="number" id="intervalSeconds" value="30" min="5">
+                <button id="toggleAutoCapture">Start Auto-Capture</button>
+            </div>
+            <div class="setting-section">
+                <h3>Alert Trigger</h3>
+                <div class="checkbox-container">
+                     <input type="checkbox" id="enableAlertCheckbox">
+                     <label for="enableAlertCheckbox">Enable Alert Trigger</label>
+                </div>
+                <label for="alertTriggerPhrase">Trigger Phrase (case-insensitive):</label>
+                <input type="text" id="alertTriggerPhrase" placeholder="e.g., Alert, Problem detected">
+                <label for="requiredTriggersInput">Required Consecutive Triggers:</label>
+                <input type="number" id="requiredTriggersInput" value="3" min="1">
+
+                <label for="phoneNumberInput">Call Number (optional):</label>
+                <input type="tel" id="phoneNumberInput" placeholder="Enter single phone number">
+
+            </div>
+            <div class="modal-buttons">
+                <button id="closeSettings">Close & Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- *** NEW: Blackout Overlay (Place outside main chat container if hiding header) *** -->
+    <div id="blackoutOverlay"></div>
+
+    <script>
+        console.log("Script start");
+
+        // --- Constants and API ---
+        const MODEL_NAME = 'gemini-1.5-flash-latest';
+
+        // --- DOM Element Variables ---
+        let chatMessages, userInput, sendButton, imagePreviewContainer, previewImageElement,
+            settingsButton, settingsModal, closeSettingsButton, toggleAutoCaptureButton,
+            customPromptInput, intervalInput, enableAlertCheckbox, alertTriggerPhraseInput,
+            requiredTriggersInput, phoneNumberInput,
+            triggerCounterDisplay, removeImageButton, apiKeyInput,
+            // *** NEW: Add references ***
+            blackoutButton, blackoutOverlay, chatHeader; // Add chatHeader here
+
+
+        // --- State Variables ---
+        let pendingImageDataUrl = null;
+        let pendingImageBase64 = null;
+        let isAutoCapturing = false;
+        let customPromptText = "";
+        let captureIntervalSeconds = 30;
+        let autoCaptureIntervalId = null;
+        let isAlertOnResponseEnabled = false;
+        let alertTriggerPhrase = "";
+        let requiredAlertTriggers = 3;
+        let currentAlertTriggerCount = 0;
+        let phoneNumber = '';
+        let userApiKey = '';
+
+        // --- Initialization Function ---
+        function initializeApp() {
+            console.log("Initializing app...");
+            try {
+                // Get references to all DOM elements
+                chatMessages = document.getElementById('chatMessages');
+                userInput = document.getElementById('userInput');
+                sendButton = document.getElementById('sendButton');
+                imagePreviewContainer = document.getElementById('imagePreviewContainer');
+                previewImageElement = document.getElementById('previewImage');
+                settingsButton = document.getElementById('settingsButton');
+                settingsModal = document.getElementById('settingsModal');
+                closeSettingsButton = document.getElementById('closeSettings');
+                toggleAutoCaptureButton = document.getElementById('toggleAutoCapture');
+                customPromptInput = document.getElementById('customPrompt');
+                intervalInput = document.getElementById('intervalSeconds');
+                enableAlertCheckbox = document.getElementById('enableAlertCheckbox');
+                alertTriggerPhraseInput = document.getElementById('alertTriggerPhrase');
+                requiredTriggersInput = document.getElementById('requiredTriggersInput');
+                phoneNumberInput = document.getElementById('phoneNumberInput');
+                triggerCounterDisplay = document.getElementById('triggerCounterDisplay');
+                removeImageButton = document.getElementById('removeImageButton');
+                apiKeyInput = document.getElementById('apiKeyInput');
+
+                // *** NEW: Get new elements ***
+                blackoutButton = document.getElementById('blackoutButton');
+                blackoutOverlay = document.getElementById('blackoutOverlay');
+                chatHeader = document.querySelector('.chat-header'); // Get header reference
+
+                // Check if all essential elements were found
+                const essentialElements = [
+                    chatMessages, userInput, sendButton, settingsButton, settingsModal, closeSettingsButton,
+                    toggleAutoCaptureButton, customPromptInput, intervalInput, enableAlertCheckbox,
+                    alertTriggerPhraseInput, requiredTriggersInput, phoneNumberInput, triggerCounterDisplay,
+                    removeImageButton, imagePreviewContainer, previewImageElement, apiKeyInput,
+                    // *** NEW: Check new elements ***
+                    blackoutButton, blackoutOverlay, chatHeader
+                ];
+                 if (essentialElements.some(el => !el)) {
+                     // Log which elements are missing for easier debugging
+                     const missing = essentialElements.map((el, index) => el ? null : ['chatMessages', 'userInput', 'sendButton', 'settingsButton', 'settingsModal', 'closeSettingsButton', 'toggleAutoCaptureButton', 'customPromptInput', 'intervalInput', 'enableAlertCheckbox', 'alertTriggerPhraseInput', 'requiredTriggersInput', 'phoneNumberInput', 'triggerCounterDisplay', 'removeImageButton', 'imagePreviewContainer', 'previewImageElement', 'apiKeyInput', 'blackoutButton', 'blackoutOverlay', 'chatHeader'][index]).filter(Boolean);
+                     console.error(`CRITICAL ERROR: One or more essential DOM elements not found! Missing: ${missing.join(', ')}. Check HTML IDs and selectors.`);
+                     alert(`Interface Error: Could not initialize elements: ${missing.join(', ')}. Check IDs/Selectors.`);
+                     return;
+                 }
+
+                console.log("All essential elements found.");
+
+                // Add Event Listeners
+                try {
+                     userInput.addEventListener('keypress', handleUserInputKeypress);
+                     sendButton.addEventListener('click', () => sendMessage());
+                     settingsButton.addEventListener('click', openSettingsModal);
+                     closeSettingsButton.addEventListener('click', closeAndSaveSettings);
+                     toggleAutoCaptureButton.addEventListener('click', toggleAutoCapture);
+                     removeImageButton.addEventListener('click', removePreviewImage);
+
+                     // *** NEW: Add listeners for blackout ***
+                     blackoutButton.addEventListener('click', activateBlackout);
+                     blackoutOverlay.addEventListener('click', deactivateBlackout); // Click overlay to dismiss
+
+                     console.log("Event listeners added.");
+                 } catch (listenerError) {
+                      console.error("Error adding event listeners:", listenerError);
+                      alert("Error setting up controls.");
+                      return;
+                 }
+
+                // Initial UI State
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        addMessage("Hello! Sentinel AI ready. Use ⚙️ for settings. Please enter your API Key.", 'assistant');
+                        adjustInputHeight();
+                        updateAlertCounterDisplay();
+                        console.log("Initial message added and UI updated.");
+                    }, 100);
+                });
+
+            } catch (initError) {
+                console.error("Error during initializeApp:", initError);
+                alert("A critical error occurred during app initialization.");
+            }
+        }
+
+        // --- Event Listener Callbacks ---
+        function handleUserInputKeypress(e) {
+            if (e.key === 'Enter' && !e.shiftKey && !sendButton.disabled) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function openSettingsModal() {
+            try {
+                apiKeyInput.value = userApiKey;
+                customPromptInput.value = customPromptText;
+                intervalInput.value = captureIntervalSeconds;
+                enableAlertCheckbox.checked = isAlertOnResponseEnabled;
+                alertTriggerPhraseInput.value = alertTriggerPhrase;
+                requiredTriggersInput.value = requiredAlertTriggers;
+                phoneNumberInput.value = phoneNumber;
+                toggleAutoCaptureButton.textContent = isAutoCapturing ? "Stop Auto-Capture" : "Start Auto-Capture";
+                toggleAutoCaptureButton.classList.toggle('stop', isAutoCapturing);
+                settingsModal.classList.add('visible');
+            } catch(error) { console.error("Error opening settings modal:", error); }
+        }
+
+        function closeAndSaveSettings() {
+             try {
+                userApiKey = apiKeyInput.value.trim();
+                isAlertOnResponseEnabled = enableAlertCheckbox.checked;
+                alertTriggerPhrase = alertTriggerPhraseInput.value.trim().toLowerCase();
+                const reqTriggersVal = parseInt(requiredTriggersInput.value, 10);
+                requiredAlertTriggers = isNaN(reqTriggersVal) || reqTriggersVal < 1 ? 1 : reqTriggersVal;
+                phoneNumber = phoneNumberInput.value.trim();
+                customPromptText = customPromptInput.value.trim();
+                const intervalVal = parseInt(intervalInput.value, 10);
+                captureIntervalSeconds = isNaN(intervalVal) || intervalVal < 5 ? 5 : intervalVal;
+
+                console.log(`Settings Saved: API Key Set (Length: ${userApiKey.length}), AutoPrompt='${customPromptText}', Interval=${captureIntervalSeconds}, AlertOn=${isAlertOnResponseEnabled}, AlertPhrase='${alertTriggerPhrase}', RequiredTriggers=${requiredAlertTriggers}, Number='${phoneNumber ? phoneNumber : 'Not set'}'`);
+                settingsModal.classList.remove('visible');
+                currentAlertTriggerCount = 0;
+                updateAlertCounterDisplay();
+                if (!userApiKey) {
+                   console.warn("API Key field is empty after saving settings.");
+                }
+             } catch(error) { console.error("Error closing/saving settings:", error); }
+        }
+
+         function toggleAutoCapture() {
+            try {
+                if (isAutoCapturing) {
+                    stopAutoCapture();
+                } else {
+                    if (!userApiKey) {
+                        alert("Please set the API Key in Settings (⚙️) before starting auto-capture.");
+                        openSettingsModal();
+                        return;
+                    }
+                    // Read settings just before starting
+                    customPromptText = customPromptInput.value.trim();
+                    const intervalVal = parseInt(intervalInput.value, 10);
+                    captureIntervalSeconds = isNaN(intervalVal) || intervalVal < 5 ? 5 : intervalVal;
+                    isAlertOnResponseEnabled = enableAlertCheckbox.checked;
+                    alertTriggerPhrase = alertTriggerPhraseInput.value.trim().toLowerCase();
+                    const reqTriggersVal = parseInt(requiredTriggersInput.value, 10);
+                    requiredAlertTriggers = isNaN(reqTriggersVal) || reqTriggersVal < 1 ? 1 : reqTriggersVal;
+                    phoneNumber = phoneNumberInput.value.trim();
+                    startAutoCapture();
+                }
+             } catch(error) { console.error("Error toggling auto-capture:", error); }
+        }
+
+        // *** NEW: Blackout Functions ***
+        function activateBlackout() {
+            console.log("Activating blackout overlay.");
+            if (blackoutOverlay) blackoutOverlay.style.display = 'block';
+            // Optional: Hide header for cleaner look
+            if (chatHeader) chatHeader.style.display = 'none';
+        }
+
+        function deactivateBlackout() {
+            console.log("Deactivating blackout overlay.");
+            if (blackoutOverlay) blackoutOverlay.style.display = 'none';
+            // Restore header if it was hidden
+            if (chatHeader) chatHeader.style.display = 'flex'; // Ensure it uses flex again
+        }
+        // *** END NEW ***
+
+
+        // --- Auto Capture Logic ---
+        function startAutoCapture() {
+            if (!customPromptText) { alert("Please enter a custom prompt in settings."); return; }
+            isAutoCapturing = true;
+            toggleAutoCaptureButton.textContent = "Stop Auto-Capture"; toggleAutoCaptureButton.classList.add('stop');
+            settingsModal.classList.remove('visible');
+            addMessage(`Auto-capture started: "${customPromptText}" every ${captureIntervalSeconds}s.`, 'assistant');
+            currentAlertTriggerCount = 0; updateAlertCounterDisplay();
+            if (autoCaptureIntervalId) clearInterval(autoCaptureIntervalId);
+            autoCaptureIntervalId = setInterval(triggerAutoCapture, captureIntervalSeconds * 1000);
+            triggerAutoCapture(); // Trigger immediately on start
+        }
+        function stopAutoCapture() {
+            if (!isAutoCapturing) return; isAutoCapturing = false;
+            if (autoCaptureIntervalId) { clearInterval(autoCaptureIntervalId); autoCaptureIntervalId = null; }
+            if (toggleAutoCaptureButton) { toggleAutoCaptureButton.textContent = "Start Auto-Capture"; toggleAutoCaptureButton.classList.remove('stop'); }
+            addMessage("Auto-capture stopped.", 'assistant'); console.log("Auto-capture stopped.");
+            currentAlertTriggerCount = 0; updateAlertCounterDisplay();
+        }
+        function triggerAutoCapture() {
+            if (!isAutoCapturing) { console.warn("triggerAutoCapture called but not running."); stopAutoCapture(); return; }
+            console.log("Auto-capture triggering photo request..."); addMessage("Auto-capturing...", 'assistant');
+             if (typeof AndroidInterface !== 'undefined' && AndroidInterface.requestPhotoCapture) {
+                 try { AndroidInterface.requestPhotoCapture(); } catch (error) { console.error("Error calling AndroidInterface.requestPhotoCapture:", error); addMessage("Error: Failed to request photo.", 'assistant'); stopAutoCapture(); }
+             } else { console.error("AndroidInterface missing."); addMessage("Error: Cannot connect to camera.", 'assistant'); stopAutoCapture(); }
+        }
+
+        // --- Image Preview Handling (from Android) ---
+        function previewImage(dataUrl) {
+            console.log("JS: Received image data URL.");
+            if (!dataUrl || !dataUrl.startsWith('data:image')) { console.error("JS: Invalid data URL received:", dataUrl); alert("Received invalid image data."); if(isAutoCapturing) stopAutoCapture(); return; }
+            try {
+                pendingImageDataUrl = dataUrl; pendingImageBase64 = dataUrl.split(',')[1];
+                if (!pendingImageBase64) throw new Error("Base64 part missing");
+                if (isAutoCapturing) { console.log("JS: Auto-capture received image, sending..."); sendMessage(true); }
+                else { // Manual: show preview
+                    previewImageElement.src = pendingImageDataUrl; imagePreviewContainer.style.display = 'block';
+                    userInput.placeholder = "Add text to accompany image..."; adjustInputHeight(); scrollToBottom();
+                }
+            } catch (error) { console.error("JS: Error processing image data:", error); alert("Error processing image."); pendingImageDataUrl = null; pendingImageBase64 = null; if(isAutoCapturing) stopAutoCapture(); }
+        }
+        function removePreviewImage() {
+            pendingImageDataUrl = null; pendingImageBase64 = null;
+            if (previewImageElement) previewImageElement.src = '';
+            if (imagePreviewContainer) imagePreviewContainer.style.display = 'none';
+            if (userInput) userInput.placeholder = "Ask anything...";
+            adjustInputHeight();
+        }
+
+        // --- Sending Message ---
+        async function sendMessage(isAutoSend = false) {
+            const messageText = isAutoSend ? customPromptText : userInput.value.trim();
+            const imageToSendBase64 = pendingImageBase64; const imageToSendUrl = pendingImageDataUrl;
+            if (!messageText && !imageToSendBase64) { console.log("sendMessage: Nothing to send."); if (!isAutoSend) removePreviewImage(); return; }
+
+             if (!userApiKey) {
+                 addMessage("Error: API Key not set. Please configure it in Settings (⚙️).", 'assistant');
+                 if (isAutoCapturing) { stopAutoCapture(); }
+                 return;
+             }
+
+            userInput.disabled = true; sendButton.disabled = true;
+            if (!isAutoSend) { userInput.value = ''; adjustInputHeight(); removePreviewImage(); }
+            else { pendingImageDataUrl = null; pendingImageBase64 = null; } // Clear data after auto-send
+
+            displayUserMessage(messageText, imageToSendUrl);
+            const parts = [];
+            if (imageToSendBase64) parts.push({ inline_data: { mime_type: "image/jpeg", data: imageToSendBase64 } });
+            if (messageText) parts.push({ text: messageText });
+
+            showLoadingIndicator(); scrollToBottom();
+            try {
+                const currentApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${userApiKey}`;
+                console.log(`Sending request to: ${MODEL_NAME} (Key length: ${userApiKey.length})`);
+
+                const response = await fetch(currentApiUrl, {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ contents: [{ parts }] })
+                });
+
+                removeLoadingIndicator(); const data = await response.json(); console.log("API Response:", data);
+
+                let replyText = null; let phraseFoundInResponse = false;
+                if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+                    replyText = data.candidates[0].content.parts[0].text;
+                    addMessage(replyText, 'assistant');
+
+                    // Alert Trigger Logic
+                    if (isAlertOnResponseEnabled && alertTriggerPhrase && requiredAlertTriggers > 0 && replyText) {
+                        if (replyText.toLowerCase().includes(alertTriggerPhrase)) {
+                            phraseFoundInResponse = true; currentAlertTriggerCount++;
+                            console.log(`Alert phrase detected! Count: ${currentAlertTriggerCount}/${requiredAlertTriggers}`);
+                            if (currentAlertTriggerCount >= requiredAlertTriggers) {
+                                console.log("Alert threshold reached!"); addMessage(`[!!! ALERT TRIGGERED (${currentAlertTriggerCount}/${requiredAlertTriggers}) !!!]`, 'assistant');
+                                // Call Android for emergency action
+                                if (phoneNumber) {
+                                    // *** CRITICAL: Ensure Android function is named initiateEmergencyCall ***
+                                    if (typeof AndroidInterface !== 'undefined' && AndroidInterface.initiateEmergencyCall) {
+                                        try {
+                                            // Pass the single phone number as a JSON array string
+                                            // OR adjust Android interface to accept a single string
+                                            AndroidInterface.initiateEmergencyCall(phoneNumber);
+                                            // OLD: AndroidInterface.initiateEmergencyCalls(JSON.stringify([phoneNumber]));
+                                            console.log(`Called AndroidInterface.initiateEmergencyCall with ${phoneNumber}`);
+                                            addMessage("[Attempting call...]", "assistant");
+                                        } catch (e) {
+                                            console.error("Error calling AndroidInterface.initiateEmergencyCall:", e);
+                                            addMessage("[Error: Could not initiate call]", "assistant");
+                                        }
+                                    } else {
+                                        console.error("AndroidInterface or initiateEmergencyCall method missing for call.");
+                                        addMessage("[Error: Cannot initiate call - interface missing]", 'assistant');
+                                    }
+                                } else {
+                                    console.warn("Alert triggered but no phone number set.");
+                                    addMessage("[Alert triggered, no number set]", "assistant");
+                                }
+                                currentAlertTriggerCount = 0; // Reset after trigger
+                                if (isAutoCapturing) { stopAutoCapture(); addMessage("Auto-capture stopped after alert.", 'assistant'); }
+                            }
+                        }
+                    }
+                } else if (data.promptFeedback?.blockReason) {
+                    const blockMessage = `Blocked: ${data.promptFeedback.blockReason}. Check Safety Settings or API Key.`; addMessage(blockMessage, 'assistant'); console.warn("API blocked:", data.promptFeedback);
+                    if (isAutoCapturing) stopAutoCapture(); currentAlertTriggerCount = 0;
+                } else if (data.error) {
+                     let errorMessage = `API Error: ${data.error.message || 'Unknown error.'}`;
+                     console.error("API Error Response:", data.error);
+                     addMessage(errorMessage, 'assistant');
+                     if (data.error.code === 400 || data.error.message.toLowerCase().includes('api key not valid')) {
+                        addMessage("Please check your API Key in Settings (⚙️).", 'assistant');
+                     }
+                     if (isAutoCapturing) stopAutoCapture(); currentAlertTriggerCount = 0;
+                }
+                else {
+                    let errorMessage = 'Error: Received unexpected response format from API.'; console.error("API Error/Format:", data); addMessage(errorMessage, 'assistant');
+                    if (isAutoCapturing) stopAutoCapture(); currentAlertTriggerCount = 0;
+                }
+                // Reset counter if phrase not found in this response
+                if (!phraseFoundInResponse && replyText != null) { if (currentAlertTriggerCount > 0) { console.log("Phrase not found, resetting counter."); currentAlertTriggerCount = 0; } }
+                updateAlertCounterDisplay();
+
+            } catch (error) { // Network error
+                removeLoadingIndicator(); addMessage('Network error. Could not reach API.', 'assistant'); console.error('Fetch Error:', error);
+                if (isAutoCapturing) stopAutoCapture(); currentAlertTriggerCount = 0; updateAlertCounterDisplay();
+            } finally { // Re-enable UI
+                 if (!isAutoCapturing) { userInput.disabled = false; sendButton.disabled = false; userInput.focus(); }
+                 scrollToBottom();
+            }
+        }
+
+        // --- UI Helper Functions ---
+        function displayUserMessage(text, imageDataUrl) {
+             const messageContainer = document.createElement('div'); messageContainer.className = 'message user-message';
+             if (imageDataUrl) { const img = document.createElement('img'); img.src = imageDataUrl; img.alt = "User image"; img.style.marginBottom = text ? '8px' : '0'; img.style.maxWidth = '100%'; img.style.maxHeight = '200px'; img.style.borderRadius = '8px'; messageContainer.appendChild(img); }
+             if (text) { const p = document.createElement('p'); p.textContent = text; messageContainer.appendChild(p); }
+             if (messageContainer.hasChildNodes()) { appendAndAnimateMessage(messageContainer); }
+        }
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div'); messageDiv.className = `message ${sender}-message`;
+            try { text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>'); messageDiv.innerHTML = text.replace(/\n/g, '<br>'); } catch(e) { console.error("Msg formatting error:", e); messageDiv.textContent = text; }
+            appendAndAnimateMessage(messageDiv);
+        }
+        function appendAndAnimateMessage(element) {
+            if (!chatMessages) { console.error("chatMessages element missing."); return; } element.style.opacity = '0'; chatMessages.appendChild(element);
+            requestAnimationFrame(() => { requestAnimationFrame(() => { element.style.transition = 'opacity 0.3s ease-out'; element.style.opacity = '1'; }); }); scrollToBottom();
+        }
+        let loadingIndicatorElement = null;
+        function showLoadingIndicator() { if (loadingIndicatorElement || !chatMessages) return; loadingIndicatorElement = document.createElement('div'); loadingIndicatorElement.className = 'loading'; loadingIndicatorElement.innerHTML = `<span></span><span></span><span></span>`; chatMessages.appendChild(loadingIndicatorElement); scrollToBottom(); }
+        function removeLoadingIndicator() { if (loadingIndicatorElement) { loadingIndicatorElement.remove(); loadingIndicatorElement = null; } }
+        function scrollToBottom() { if (!chatMessages) return; setTimeout(() => { chatMessages.scrollTop = chatMessages.scrollHeight; }, 50); }
+        function autoGrow(element) { if (!element) return; element.style.height = 'auto'; element.style.height = (element.scrollHeight) + 'px'; adjustInputHeight(); }
+        function adjustInputHeight() { scrollToBottom(); }
+
+        // --- Update Trigger Counter Display ---
+         function updateAlertCounterDisplay() {
+             if (!triggerCounterDisplay) { console.error("Trigger counter display missing."); return; }
+             if (isAlertOnResponseEnabled && alertTriggerPhrase && requiredAlertTriggers > 0) {
+                 triggerCounterDisplay.textContent = `Alert: ${currentAlertTriggerCount}/${requiredAlertTriggers}`;
+                 triggerCounterDisplay.classList.toggle('visible', currentAlertTriggerCount > 0);
+             } else {
+                 triggerCounterDisplay.classList.remove('visible');
+             }
+         }
+
+         // --- Wait for DOM to be fully loaded before initializing ---
+         document.addEventListener('DOMContentLoaded', initializeApp);
+
+         console.log("Script end");
+
+    </script>
+</body>
+</html>
